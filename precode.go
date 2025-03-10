@@ -18,25 +18,23 @@ func Generator(ctx context.Context, ch chan<- int64, fn func(int64)) {
 	// ...
 	// N(0) = 1;
 	// N(i) = N(i-1) + 1
-	fmt.Println("Функция Generator")
+	//fmt.Println("Функция Generator")
 	var num int64
 	num = 1
 	for {
 
 		select {
 		case <-ctx.Done():
-			fmt.Println("ctx.Done")
 			close(ch)
-			break
+			return
 		default:
 			ch <- num
 			fn(num)
-			//fmt.Println("inputCount= ", inputCount)
 			num++
 			continue
 		}
 	}
-	fmt.Println("End of Generator")
+
 }
 
 // Worker читает число из канала in и пишет его в канал out.
@@ -51,10 +49,8 @@ func Worker(in <-chan int64, out chan<- int64) {
 			break
 		}
 		out <- v
-		fmt.Println("Worker v = ", v)
 		time.Sleep(1 * time.Millisecond)
 	}
-	//return
 
 }
 
@@ -76,10 +72,8 @@ func main() {
 		//inputCount++
 		atomic.AddInt64(&inputSum, i)
 		atomic.AddInt64(&inputCount, 1)
-		fmt.Println("inputSum=", inputSum, " inputCount=", inputCount)
+		//fmt.Println("inputSum=", inputSum, " inputCount=", inputCount)
 	})
-
-	fmt.Println("After Generator")
 
 	const NumOut = 5 // количество обрабатывающих горутин и каналов
 	// outs — слайс каналов, куда будут записываться числа из chIn
@@ -89,7 +83,6 @@ func main() {
 		outs[i] = make(chan int64)
 		go Worker(chIn, outs[i])
 	}
-	fmt.Println("After Worker")
 	// amounts — слайс, в который собирается статистика по горутинам
 	amounts := make([]int64, NumOut)
 	// chOut — канал, в который будут отправляться числа из горутин `outs[i]`
@@ -103,15 +96,17 @@ func main() {
 	for i = 0; i < NumOut; i++ {
 		wg.Add(1)
 		go func(in <-chan int64, i int64) {
-			wg.Done()
+			defer wg.Done()
 			for a := range in {
 				chOut <- a
 				amounts[i]++
 			}
+			//wg.Done()
+
 		}(outs[i], int64(i))
 
 	}
-	//fmt.Println("After 4")
+
 	go func() {
 		// ждём завершения работы всех горутин для outs
 		wg.Wait()
